@@ -247,6 +247,14 @@ const TOOLS_DEFINITIONS = [
 	{
 		type: "function",
 		function: {
+			name: "openwa_qr",
+			description: "Get WhatsApp pairing QR status for a session. Returns status (READY already-linked | qr_ready scan-needed + scan URL + expiry note). NEVER dump base64 into chat. Tell user to open the QR page in a browser and scan with their dedicated WhatsApp number.",
+			parameters: { type: "object", properties: { session: { type: "string" } } },
+		},
+	},
+	{
+		type: "function",
+		function: {
 			name: "openwa_bulk",
 			description: "Send bulk WhatsApp texts via POST /messages/send-bulk (max 100). Supports {{variables}} per message. Throttled with delayBetweenMessages. Confirm recipient list with user before large blasts.",
 			parameters: {
@@ -476,6 +484,26 @@ async function executeTool(name, args) {
 			} catch (e) {
 				return { success: false, output: `openwa_send failed: ${e.message}`, duration: Date.now() - startTime };
 			}
+		} else if (name === "openwa_qr") {
+			try {
+				const session = args.session || OPENWA_SESSION;
+				const list = await openwaFetch("/sessions");
+				const sessions = list.sessions || list.data || list || [];
+				const arr = Array.isArray(sessions) ? sessions : [];
+				const hit = arr.find((s) => (s.name || s.id) === session || s.id === session);
+				if (!hit) return { success: false, output: `No OpenWA session '${session}'. Create it from the OpenWA dashboard first.`, duration: Date.now() - startTime };
+				const status = hit.status || "unknown";
+				if (status === "ready" || status === "READY" || status === "connected") {
+					return { success: true, output: `Session '${session}' is READY (already linked). No QR needed. Proceed to openwa_check/openwa_send.`, duration: Date.now() - startTime };
+				}
+				const sid = hit.id || hit.sessionId || session;
+				let qrOk = false;
+				try { const q = await openwaFetch(`/sessions/${sid}/qr`); qrOk = !!(q.qrCode || q.qr); } catch { qrOk = false; }
+				const page = `/api/openwa/qr-page?session=${encodeURIComponent(session)}`;
+				return { success: true, output: `Session '${session}' status=${status}. QR ${qrOk ? "AVAILABLE" : "not yet available — wait 15s and retry"}. Tell user: open ${page} in a browser (same host as this UI) and scan with the DEDICATED WhatsApp number within ~60s (QR rotates). Then ask them to say "check status" so you can re-verify with openwa_status. NEVER paste base64.`, duration: Date.now() - startTime };
+			} catch (e) {
+				return { success: false, output: `openwa_qr failed: ${e.message}`, duration: Date.now() - startTime };
+			}
 		} else if (name === "openwa_bulk") {
 			try {
 				const session = args.session || OPENWA_SESSION;
@@ -655,6 +683,44 @@ const server = http.createServer((req, res) => {
 		return;
 	}
 
+	if (pathname === "/api/openwa/qr" && req.method === "GET") {
+		(async () => {
+			try {
+				if (!OPENWA_API_KEY) { res.writeHead(500, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "OPENWA_API_KEY not configured on server" })); return; }
+				const session = parsedUrl.searchParams.get("session") || OPENWA_SESSION;
+				const list = await openwaFetch("/sessions");
+				const arr = Array.isArray(list) ? list : list.sessions || list.data || [];
+				const hit = (Array.isArray(arr) ? arr : []).find((s) => (s.name || s.id) === session || s.id === session);
+				if (!hit) { res.writeHead(404, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: `No session '${session}'` })); return; }
+				const status = hit.status || "unknown";
+				if (status === "ready" || status === "READY" || status === "connected") {
+					res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+					res.end(`<html><body style="font-family:sans-serif;text-align:center;padding-top:60px"><h2>Session '${session}' is already linked (READY).</h2><p>No QR needed. Close this tab and tell the agent to proceed.</p></body></html>`);
+					return;
+				}
+				const sid = hit.id || hit.sessionId || session;
+				const q = await openwaFetch(`/sessions/${sid}/qr`);
+				const dataUrl = q.qrCode || q.qr || "";
+				const m = String(dataUrl).match(/^data:image\/png;base64,(.+)$/s);
+				if (!m) { res.writeHead(502, { "Content-Type": "application/json" }); res.end(JSON.stringify({ error: "QR not available yet, refresh in 15s", status })); return; }
+				const buf = Buffer.from(m[1], "base64");
+				res.writeHead(200, { "Content-Type": "image/png", "Cache-Control": "no-store", "Content-Length": buf.length });
+				res.end(buf);
+			} catch (e) {
+				res.writeHead(502, { "Content-Type": "application/json" });
+				res.end(JSON.stringify({ error: e.message }));
+			}
+		})();
+		return;
+	}
+
+	if (pathname === "/api/openwa/qr-page" && req.method === "GET") {
+		const session = parsedUrl.searchParams.get("session") || OPENWA_SESSION;
+		res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
+		res.end(`<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Scan WhatsApp QR - ${session}</title></head><body style="font-family:sans-serif;text-align:center;background:#070a12;color:#e8eef7"><h2 style="margin-top:32px">Scan to link <b>${session}</b></h2><p>Use your DEDICATED WhatsApp number (never your primary). QR rotates ~60s — page auto-refreshes.</p><img id="qr" src="/api/openwa/qr?session=${encodeURIComponent(session)}" style="width:min(78vw,340px);border:8px solid #fff;border-radius:12px" onerror="document.getElementById('msg').textContent='QR not ready yet — retrying...'"><p id="msg"></p><script>setTimeout(()=>location.reload(),45000)</script></body></html>`);
+		return;
+	}
+
 	if (pathname === "/api/tools/bash" && req.method === "POST") {
 		let body = "";
 		req.on("data", (chunk) => (body += chunk));
@@ -770,6 +836,11 @@ TOOLS:
 - openwa_send {to, text, session?} -> single send. Phone auto-normalized to chatId. Max 4096 chars.
 - openwa_bulk {messages[{to,text,variables}], session?, delayMs default 3000} -> max 100/batch, {{variables}} templating, throttled.
 - bash/read_file/write_file/list_files/search_code -> general workspace work.
+
+QR PAIRING (do this before any first send):
+1. openwa_status. If READY -> proceed. If qr_ready/created/need_qr -> call openwa_qr.
+2. Give user the QR page link (/api/openwa/qr-page?session=NAME on THIS UI host) + dedicated-number warning + 60s rotation note. NEVER paste base64.
+3. After they scan, re-check openwa_status until READY. Do NOT attempt sends while not READY.
 
 WORKFLOWS:
 A) "find X without website" (e.g. "go to google maps find dentists in Mumbai that dont have website"):
