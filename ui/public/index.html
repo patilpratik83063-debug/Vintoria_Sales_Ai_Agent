@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Vintoria Sales Agent — DeepSeek Autonomous Suite</title>
+  <link rel="icon" type="image/png" href="/assets/logo.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/atom-one-dark.min.css">
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/highlight.min.js"></script>
+</head>
+<body>
+  <!-- Ambient Interactive Canvas Background -->
+  <canvas id="bg-canvas"></canvas>
+
+  <div class="app-layout">
+    <!-- Top Navigation Header -->
+    <header class="app-header">
+      <div class="header-left">
+        <div class="logo-container">
+          <div class="logo-icon">
+            <img src="/assets/logo.png" alt="Vintoria" class="header-logo-img">
+            <div class="logo-pulse"></div>
+          </div>
+          <div class="logo-text">
+            <span class="brand-title">VINTORIA<span class="accent-dot">.</span>SALES AGENT</span>
+            <span class="brand-subtitle">Autonomous AI Intelligence</span>
+          </div>
+        </div>
+
+        <div class="status-badge" id="connection-status">
+          <span class="status-dot online"></span>
+          <span class="status-label">DeepSeek Active</span>
+        </div>
+      </div>
+
+      <div class="header-center">
+        <div class="model-pill-selector">
+          <div class="model-tag">MODEL</div>
+          <select id="model-select" class="model-dropdown">
+            <option value="deepseek-chat" selected>DeepSeek Chat (V3) — Fast</option>
+            <option value="deepseek-reasoner">DeepSeek Reasoner (R1) — Thinking</option>
+            <option value="deepseek-v4-pro">DeepSeek V4 Pro — 1M Context</option>
+            <option value="deepseek-v4-flash">DeepSeek V4 Flash — High Speed</option>
+          </select>
+        </div>
+
+        <button id="deep-think-toggle" class="mode-toggle-btn" title="Toggle DeepSeek R1 Chain-of-Thought Reasoning">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/>
+          </svg>
+          <span>Deep Think</span>
+          <span class="toggle-indicator"></span>
+        </button>
+      </div>
+
+      <div class="header-right">
+        <div class="telemetry-chip" title="Total Session Tokens">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <polyline points="12 6 12 12 16 14"></polyline>
+          </svg>
+          <span id="token-counter">0 tokens</span>
+        </div>
+
+        <button id="btn-terminal" class="icon-btn" title="Toggle Terminal & Inspector">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polyline points="4 17 10 11 4 5"></polyline>
+            <line x1="12" y1="19" x2="20" y2="19"></line>
+          </svg>
+        </button>
+
+        <button id="btn-files" class="icon-btn" title="Toggle Workspace Files">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </button>
+
+        <button id="btn-settings" class="icon-btn" title="Settings & API Key">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- App Body with Sidebars and Chat -->
+    <div class="app-body">
+      <!-- Left Sidebar: Sessions & Workflows -->
+      <aside class="sidebar-left" id="sidebar-left">
+        <div class="sidebar-header">
+          <button id="btn-new-chat" class="new-chat-btn">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <line x1="12" y1="5" x2="12" y2="19"></line>
+              <line x1="5" y1="12" x2="19" y2="12"></line>
+            </svg>
+            <span>New Session</span>
+          </button>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-title">QUICK CAPABILITIES</div>
+          <div class="workflow-cards">
+            <div class="workflow-card" data-prompt="Find dentists in Mumbai, India that don't have a website. Start with a depth-1 validation scrape, then show me total count, no-website count, and a 20-row preview.">
+              <div class="card-icon cyan">🗺️</div>
+              <div class="card-info">
+                <div class="card-title">Find No-Website Leads</div>
+                <div class="card-desc">Maps scrape + filter empty website</div>
+              </div>
+            </div>
+
+            <div class="workflow-card" data-prompt="Check OpenWA status for session vintoria-sales. Tell me if it is READY or if I need to scan QR.">
+              <div class="card-icon purple">💬</div>
+              <div class="card-info">
+                <div class="card-title">WhatsApp Status</div>
+                <div class="card-desc">Session READY / QR check</div>
+              </div>
+            </div>
+
+            <div class="workflow-card" data-prompt="I want to send WhatsApp messages to my last leads. Ask me for the message text if missing, validate numbers with openwa_check, then confirm preview before bulk send.">
+              <div class="card-icon green">📤</div>
+              <div class="card-info">
+                <div class="card-title">Send WhatsApp Bulk</div>
+                <div class="card-desc">Validate + throttled outreach</div>
+              </div>
+            </div>
+
+            <div class="workflow-card" data-prompt="Show gmaps_status for my latest scrape job and then gmaps_results with filter_no_website=true, limit 20.">
+              <div class="card-icon amber">📊</div>
+              <div class="card-info">
+                <div class="card-title">Leads Status</div>
+                <div class="card-desc">Poll job & preview results</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-section">
+          <div class="section-title">ACTIVE TOOLS</div>
+          <div class="tools-pills">
+            <div class="tool-pill active" title="Shell Command Execution"><span class="pill-dot"></span>bash</div>
+            <div class="tool-pill active" title="Google Maps scrape (Docker)"><span class="pill-dot"></span>gmaps_scrape</div>
+            <div class="tool-pill active" title="Scrape job status"><span class="pill-dot"></span>gmaps_status</div>
+            <div class="tool-pill active" title="Leads preview + no-website filter"><span class="pill-dot"></span>gmaps_results</div>
+            <div class="tool-pill active" title="WhatsApp gateway status"><span class="pill-dot"></span>openwa_status</div>
+            <div class="tool-pill active" title="WhatsApp number check"><span class="pill-dot"></span>openwa_check</div>
+            <div class="tool-pill active" title="WhatsApp single send"><span class="pill-dot"></span>openwa_send</div>
+            <div class="tool-pill active" title="WhatsApp bulk send"><span class="pill-dot"></span>openwa_bulk</div>
+            <div class="tool-pill active" title="Read Files"><span class="pill-dot"></span>read_file</div>
+            <div class="tool-pill active" title="Write & Edit Files"><span class="pill-dot"></span>write_file</div>
+          </div>
+        </div>
+
+        <div class="sidebar-footer">
+          <div class="sidebar-brand-card">
+            <img src="/assets/logo.png" alt="Vintoria" class="sidebar-logo-img">
+            <div class="sidebar-brand-text">
+              <span class="brand-name">Vintoria Sales</span>
+              <span class="brand-sub">Autonomous Suite</span>
+            </div>
+          </div>
+          <div class="harness-badge">
+            <div class="harness-indicator"></div>
+            <span>Continual Harness Active</span>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Chat & Stream Area -->
+      <main class="chat-container">
+        <div class="chat-messages" id="chat-messages">
+          <!-- Hero Banner (Shows when no messages) -->
+          <div class="hero-card" id="hero-card">
+            <div class="hero-logo-wrapper">
+              <img src="/assets/logo.png" alt="Vintoria Sales Agent" class="hero-logo-img">
+              <div class="hero-logo-glow"></div>
+            </div>
+            <div class="hero-tag">NEXT-GEN AGENTIC RUNTIME</div>
+            <h1 class="hero-title">Vintoria Sales Agent <span class="gradient-text">× DeepSeek</span></h1>
+            <p class="hero-desc">
+              Maps-to-WhatsApp sales prospector: scrape Google Maps leads (no-website filter), validate numbers, and send throttled WhatsApp outreach via OpenWA — powered by DeepSeek-V3 & R1.
+            </p>
+
+            <div class="hero-features">
+              <div class="feature-item">
+                <div class="feat-icon">⚡</div>
+                <div class="feat-text"><strong>Real-Time Reasoning:</strong> Live R1 chain-of-thought streaming with elapsed timer</div>
+              </div>
+              <div class="feature-item">
+                <div class="feat-icon">🛠️</div>
+                <div class="feat-text"><strong>Autonomous Tools:</strong> Live bash execution, file mutation, and code inspection</div>
+              </div>
+              <div class="feature-item">
+                <div class="feat-icon">🔮</div>
+                <div class="feat-text"><strong>1M Context Ready:</strong> DeepSeek V4 Pro and Flash high-throughput support</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Floating Input Bar -->
+        <div class="prompt-bar-container">
+          <div class="prompt-bar" id="prompt-bar">
+            <div class="prompt-bar-top">
+              <div class="active-model-chip" id="current-model-chip">
+                <span class="chip-circle"></span>
+                <span id="chip-model-name">deepseek-chat</span>
+              </div>
+              <div class="prompt-status" id="prompt-status">Ready</div>
+            </div>
+
+            <div class="prompt-input-row">
+              <textarea
+                id="prompt-input"
+                class="prompt-textarea"
+                placeholder="Ask Vintoria Sales Agent or describe a task... (Shift+Enter for newline)"
+                rows="1"
+              ></textarea>
+
+              <div class="prompt-actions">
+                <button id="btn-send" class="btn-primary" title="Send Prompt (Enter)">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="22" y1="2" x2="11" y2="13"></line>
+                    <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                  </svg>
+                </button>
+                <button id="btn-stop" class="btn-danger hidden" title="Abort Execution">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <rect x="6" y="6" width="12" height="12"></rect>
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="prompt-bar-footer">
+              <span class="kbd-hint"><kbd>Enter</kbd> to run</span>
+              <span class="kbd-hint"><kbd>Shift</kbd>+<kbd>Enter</kbd> for newline</span>
+              <span class="kbd-hint"><kbd>Ctrl</kbd>+<kbd>K</kbd> to clear</span>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Right Drawer: Workspace Files & Terminal -->
+      <aside class="drawer-right hidden" id="drawer-right">
+        <div class="drawer-tabs">
+          <button class="drawer-tab active" data-tab="files">Workspace Files</button>
+          <button class="drawer-tab" data-tab="terminal">Terminal Console</button>
+        </div>
+
+        <div class="drawer-content" id="tab-files">
+          <div class="drawer-search">
+            <input type="text" id="file-search-input" placeholder="Search files...">
+          </div>
+          <div class="file-tree" id="file-tree">
+            <div class="loading-spinner">Loading repository files...</div>
+          </div>
+        </div>
+
+        <div class="drawer-content hidden" id="tab-terminal">
+          <div class="terminal-container">
+            <div class="terminal-logs" id="terminal-logs">
+              <div class="log-line info">Vintoria Sales Agent Terminal Ready.</div>
+              <div class="log-line info">Type commands to run in workspace.</div>
+            </div>
+            <div class="terminal-input-bar">
+              <span class="prompt-symbol">$</span>
+              <input type="text" id="terminal-input" placeholder="e.g. git status, npm run check...">
+            </div>
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div class="modal-overlay hidden" id="settings-modal">
+    <div class="modal-card">
+      <div class="modal-header">
+        <div class="modal-title-wrap">
+          <img src="/assets/logo.png" alt="Vintoria" class="modal-logo-img">
+          <div class="modal-title">Settings & DeepSeek Configuration</div>
+        </div>
+        <button id="modal-close" class="modal-close-btn">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>DeepSeek API Key</label>
+          <div class="input-with-action">
+            <input type="password" id="modal-api-key" placeholder="sk-...">
+            <button id="btn-toggle-key-visibility" class="btn-subtle">Show</button>
+          </div>
+          <span class="field-hint">Stored securely in local environment & .prime/agent/auth.json</span>
+        </div>
+
+        <div class="form-group">
+          <label>API Endpoint Base URL</label>
+          <input type="text" id="modal-base-url" value="https://api.deepseek.com">
+        </div>
+
+        <div class="form-group">
+          <label>Default Model</label>
+          <select id="modal-default-model">
+            <option value="deepseek-chat">deepseek-chat (DeepSeek-V3)</option>
+            <option value="deepseek-reasoner">deepseek-reasoner (DeepSeek-R1)</option>
+            <option value="deepseek-v4-pro">deepseek-v4-pro</option>
+            <option value="deepseek-v4-flash">deepseek-v4-flash</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label>OpenWA Base URL</label>
+          <input type="text" id="modal-openwa-url" value="http://localhost:2785">
+          <span class="field-hint">WhatsApp gateway (dashboard + REST on :2785)</span>
+        </div>
+
+        <div class="form-group">
+          <label>OpenWA API Key</label>
+          <div class="input-with-action">
+            <input type="password" id="modal-openwa-key" placeholder="owa_k1_...">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>OpenWA Session</label>
+          <input type="text" id="modal-openwa-session" value="vintoria-sales">
+        </div>
+
+        <div class="form-group">
+          <button id="btn-test-key" class="btn-secondary">
+            <span>Ping DeepSeek Connection</span>
+            <span id="test-status"></span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-save-settings" class="btn-primary">Save Configuration</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
