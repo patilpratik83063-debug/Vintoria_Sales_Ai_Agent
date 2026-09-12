@@ -45,6 +45,7 @@ const PORT = Number(process.env.PORT || envConfig.PORT || 4173);
 let OPENWA_BASE_URL = (process.env.OPENWA_BASE_URL || envConfig.OPENWA_BASE_URL || "http://localhost:2785").replace(/\/$/, "");
 let OPENWA_API_KEY = process.env.OPENWA_API_KEY || envConfig.OPENWA_API_KEY || "";
 let OPENWA_SESSION = process.env.OPENWA_SESSION || envConfig.OPENWA_SESSION || "vintoria-sales";
+let PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || envConfig.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 // GMaps job store (async detach so long crawls never block the WS loop)
 const gmapsJobs = new Map();
 const GMAPS_TMP_ROOT = path.join(osTmpDir(), "vintoria-gmaps");
@@ -499,8 +500,8 @@ async function executeTool(name, args) {
 				const sid = hit.id || hit.sessionId || session;
 				let qrOk = false;
 				try { const q = await openwaFetch(`/sessions/${sid}/qr`); qrOk = !!(q.qrCode || q.qr); } catch { qrOk = false; }
-				const page = `/api/openwa/qr-page?session=${encodeURIComponent(session)}`;
-				return { success: true, output: `Session '${session}' status=${status}. QR ${qrOk ? "AVAILABLE" : "not yet available — wait 15s and retry"}. Tell user: open ${page} in a browser (same host as this UI) and scan with the DEDICATED WhatsApp number within ~60s (QR rotates). Then ask them to say "check status" so you can re-verify with openwa_status. NEVER paste base64.`, duration: Date.now() - startTime };
+				const page = `${PUBLIC_BASE_URL}/api/openwa/qr-page?session=${encodeURIComponent(session)}`;
+				return { success: true, output: `Session '${session}' status=${status}. QR ${qrOk ? "AVAILABLE" : "not yet available — wait 15s and retry"}. Tell user: open EXACTLY this link (copy verbatim, do not alter host/port): ${page} and scan with the DEDICATED WhatsApp number within ~60s (QR rotates; page auto-refreshes). Then ask them to say "check status" so you can re-verify with openwa_status. NEVER paste base64.`, duration: Date.now() - startTime };
 			} catch (e) {
 				return { success: false, output: `openwa_qr failed: ${e.message}`, duration: Date.now() - startTime };
 			}
@@ -560,6 +561,7 @@ const server = http.createServer((req, res) => {
 					{ id: "deepseek-v4-flash", name: "DeepSeek V4 Flash", context: "1M", reasoning: true, tag: "High Speed" },
 				],
 				openwa: { baseUrl: OPENWA_BASE_URL, session: OPENWA_SESSION, hasKey: !!OPENWA_API_KEY },
+				publicBaseUrl: PUBLIC_BASE_URL,
 				gmapsJobs: [...gmapsJobs.keys()],
 				rootPath: ROOT_DIR,
 			}),
@@ -580,6 +582,7 @@ const server = http.createServer((req, res) => {
 				if (data.openwaBaseUrl) OPENWA_BASE_URL = String(data.openwaBaseUrl).trim().replace(/\/$/, "");
 				if (data.openwaApiKey) OPENWA_API_KEY = String(data.openwaApiKey).trim();
 				if (data.openwaSession) OPENWA_SESSION = String(data.openwaSession).trim();
+				if (data.publicBaseUrl) PUBLIC_BASE_URL = String(data.publicBaseUrl).trim().replace(/\/$/, "");
 
 				// Persist to .env if desired
 				try {
