@@ -885,6 +885,10 @@ body {
   50% { transform: scale(1.06); box-shadow: 0 0 20px rgba(239, 68, 68, 0.7); }
 }
 
+.hidden {
+  display: none !important;
+}
+
 .prompt-bar-footer {
   display: flex;
   gap: 14px;

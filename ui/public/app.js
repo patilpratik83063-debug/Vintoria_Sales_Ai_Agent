@@ -86,6 +86,12 @@
     ws.onclose = () => {
       console.warn("[WS] Disconnected. Reconnecting in 2s...");
       updateConnectionStatus(false, "Reconnecting...");
+      if (isGenerating) {
+        clearInterval(thinkingTimerInterval);
+        setGeneratingState(false);
+        particleSpeedMultiplier = 1;
+        renderSystemNote("Connection dropped mid-run. Reconnecting — send again if the answer never arrived.", true);
+      }
       setTimeout(connectWebSocket, 2000);
     };
 
@@ -164,7 +170,22 @@
       case "error":
         handleServerError(data.error);
         break;
+
+      case "session_cleared":
+        clearInterval(thinkingTimerInterval);
+        setGeneratingState(false);
+        particleSpeedMultiplier = 1;
+        break;
     }
+  }
+
+  function renderSystemNote(text, isError) {
+    if (heroCard) heroCard.style.display = "none";
+    const msgCard = document.createElement("div");
+    msgCard.className = "message-card assistant";
+    msgCard.innerHTML = `<div class="assistant-bubble"><div style="background: ${isError ? "rgba(239, 68, 68, 0.15)" : "rgba(0, 240, 255, 0.08)"}; border: 1px solid ${isError ? "var(--accent-danger)" : "var(--accent-cyan)"}; border-radius: 8px; padding: 12px; color: ${isError ? "#fca5a5" : "var(--text-secondary)"}; font-size: 13px;">${escapeHtml(text)}</div></div>`;
+    chatMessages.appendChild(msgCard);
+    scrollToBottom();
   }
 
   // ==============================================================================
@@ -344,6 +365,11 @@
       tokenCounter.textContent = `${totalSessionTokens.toLocaleString()} tokens`;
     }
 
+    activeAssistantCard = null;
+    activeMarkdownBody = null;
+    activeReasoningBox = null;
+    activeReasoningContent = null;
+    activeReasoningTimer = null;
     scrollToBottom();
   }
 
@@ -354,7 +380,11 @@
 
     if (activeMarkdownBody) {
       activeMarkdownBody.innerHTML += '<p style="color: var(--accent-danger); font-size: 12px; margin-top: 10px;">[Generation aborted by user]</p>';
+    } else {
+      renderSystemNote("[Generation aborted by user]", true);
     }
+    activeAssistantCard = null;
+    activeMarkdownBody = null;
   }
 
   function handleServerError(err) {
@@ -364,7 +394,11 @@
 
     if (activeMarkdownBody) {
       activeMarkdownBody.innerHTML += `<div style="background: rgba(239, 68, 68, 0.15); border: 1px solid var(--accent-danger); border-radius: 8px; padding: 12px; color: #fca5a5; margin-top: 10px;"><strong>Error:</strong> ${escapeHtml(err)}</div>`;
+    } else {
+      renderSystemNote(`Error: ${err}`, true);
     }
+    activeAssistantCard = null;
+    activeMarkdownBody = null;
   }
 
   // ==============================================================================
@@ -391,7 +425,8 @@
         }),
       );
     } else {
-      alert("WebSocket connection not active. Please wait or reload.");
+      renderSystemNote("Not connected yet — wait for 'DeepSeek Active' and send again.", true);
+      promptInput.value = text;
     }
   }
 
