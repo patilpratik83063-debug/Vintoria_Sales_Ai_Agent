@@ -1,5 +1,6 @@
 import http from "node:http";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { exec, spawn } from "node:child_process";
@@ -47,14 +48,20 @@ let OPENWA_API_KEY = process.env.OPENWA_API_KEY || envConfig.OPENWA_API_KEY || "
 let OPENWA_SESSION = process.env.OPENWA_SESSION || envConfig.OPENWA_SESSION || "vintoria-sales";
 let PUBLIC_BASE_URL = (process.env.PUBLIC_BASE_URL || envConfig.PUBLIC_BASE_URL || `http://localhost:${PORT}`).replace(/\/$/, "");
 // GMaps job store (async detach so long crawls never block the WS loop)
+// Jobs persist as job.json per output dir so they survive UI restarts.
 const gmapsJobs = new Map();
-const GMAPS_TMP_ROOT = path.join(osTmpDir(), "vintoria-gmaps");
-function osTmpDir() {
-	try {
-		return fs.realpathSync(process.env.TEMP || process.env.TMP || "C:\\Windows\\Temp");
-	} catch {
-		return process.env.TEMP || "C:\\Windows\\Temp";
+const GMAPS_TMP_ROOT = path.join(os.tmpdir(), "vintoria-gmaps");
+try {
+	fs.mkdirSync(GMAPS_TMP_ROOT, { recursive: true });
+	for (const dir of fs.readdirSync(GMAPS_TMP_ROOT)) {
+		try {
+			const meta = JSON.parse(fs.readFileSync(path.join(GMAPS_TMP_ROOT, dir, "job.json"), "utf-8"));
+			if (meta && meta.jobId) gmapsJobs.set(meta.jobId, { ...meta, outputDir: path.join(GMAPS_TMP_ROOT, dir) });
+		} catch { /* ignore incomplete dirs */ }
 	}
+	if (gmapsJobs.size) console.log(`Restored ${gmapsJobs.size} gmaps job(s) from ${GMAPS_TMP_ROOT}`);
+} catch (e) {
+	console.error("GMaps restore failed:", e.message);
 }
 
 // MIME types dictionary
@@ -429,7 +436,9 @@ async function executeTool(name, args) {
 						resolve({ success: false, output: `Docker start failed. Is Docker running? ${stderr || err.message}\nTried: docker ${dockerArgs.join(" ")}`, duration: Date.now() - startTime });
 						return;
 					}
-					gmapsJobs.set(jobId, { jobId, container, outputDir, format, queries, depth, startedAt: Date.now(), containerId: stdout.trim() });
+					const meta = { jobId, container, outputDir, format, queries, depth, startedAt: Date.now(), containerId: stdout.trim() };
+					gmapsJobs.set(jobId, meta);
+					try { fs.writeFileSync(path.join(outputDir, "job.json"), JSON.stringify(meta, null, 2)); } catch { /* non-fatal */ }
 					resolve({ success: true, output: `Scrape started. jobId=${jobId}\nQueries: ${queries.length} | depth=${depth} | format=${format} | email=${email}\nOutput: ${outputDir}\nPoll with gmaps_status {jobId}, read with gmaps_results {jobId, filter_no_website}. First poll after ~30s.`, duration: Date.now() - startTime });
 				});
 			});
